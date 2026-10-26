@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CJI Gateway — Unified Control Dashboard</title>
+  <meta name="description"
+    content="Unified dashboard for CJI industrial gateway: RGB/RGBW LED control and GPIO port management.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- ══ HEADER ══════════════════════════════════════════════════ -->
+    <header>
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+            <circle cx="7" cy="10" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="10" r="1.5" fill="currentColor" />
+            <circle cx="17" cy="10" r="1.5" fill="currentColor" />
+          </svg>
+        </div>
+        <div>
+          <h1>CJI Gateway <span class="tag">WMD-7621U</span></h1>
+          <div class="subtitle">Unified Control — RS-485 RGBW &bull; GPIO Port Manager</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="gateway-badge">
+          <div class="status-dot" id="conn-dot"></div>
+          <span id="conn-label">192.168.11.1</span>
+        </div>
+        <button class="icon-btn" id="refresh-btn" onclick="refreshAll()" title="Refresh port states">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══ SECTION TABS ════════════════════════════════════════════ -->
+    <div class="section-tabs">
+      <button class="sec-tab active" id="tab-rgb" onclick="switchSection('rgb')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v18M3 12h18" opacity=".4" />
+          <circle cx="12" cy="12" r="4" fill="url(#rgbGrad)" stroke="none" />
+          <defs>
+            <radialGradient id="rgbGrad">
+              <stop offset="0%" stop-color="#f87171" />
+              <stop offset="100%" stop-color="#818cf8" />
+            </radialGradient>
+          </defs>
+        </svg>
+        RGB / RGBW Controller
+      </button>
+      <button class="sec-tab" id="tab-ports" onclick="switchSection('ports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <circle cx="8" cy="12" r="2" />
+          <circle cx="16" cy="12" r="2" />
+          <path d="M12 6v12" opacity=".4" />
+        </svg>
+        GPIO Port Control
+      </button>
+      <button class="sec-tab" id="tab-sensor" onclick="switchSection('sensor')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+          <circle cx="11.5" cy="17.5" r="2.2" fill="url(#envGrad)" stroke="none" />
+          <defs>
+            <radialGradient id="envGrad">
+              <stop offset="0%" stop-color="#10b981" />
+              <stop offset="100%" stop-color="#06b6d4" />
+            </radialGradient>
+          </defs>
+        </svg>
+        Environmental Sensor
+      </button>
+    </div>
+
+    <!-- ══ RGB SECTION ═════════════════════════════════════════════ -->
+    <div id="section-rgb" class="section">
+      <div class="grid-2">
+
+        <!-- Color Control Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>Live Color Control</span>
+            <button class="btn btn-danger sm" onclick="powerToggle()">⊗ All OFF</button>
+          </div>
+
+          <!-- Mode Tabs -->
+          <div class="mode-selector">
+            <div class="mode-tab active" id="mtab-both" onclick="setProtocolMode('both')">Dual Protocol</div>
+            <div class="mode-tab" id="mtab-a1" onclick="setProtocolMode('a1')">Circuit Dim (A1)</div>
+            <div class="mode-tab" id="mtab-a0" onclick="setProtocolMode('a0')">Master RGB (A0)</div>
+          </div>
+
+          <!-- Preview -->
+          <div class="preview-stage" id="preview-stage">
+            <div class="preview-glow" id="preview-glow"></div>
+            <div class="preview-content">
+              <div class="hex-display" id="hex-label">#FF0000</div>
+              <div class="rgb-display" id="rgb-label">RGBW(255, 0, 0, 0) &bull; 100%</div>
+            </div>
+          </div>
+
+          <!-- Picker Row -->
+          <div class="picker-row">
+            <input type="color" id="native-picker" class="native-picker" value="#ff0000"
+              onchange="onColorPicked(this.value)">
+            <div class="picker-info">
+              <div style="font-size:13px;font-weight:700;">Custom Palette</div>
+              <div style="font-size:11px;color:var(--text-muted);">Pick any color &bull; Transmits immediately</div>
+            </div>
+            <button class="btn btn-primary" onclick="applyCurrentColor()">Transmit ➤</button>
+          </div>
+
+          <!-- Brightness -->
+          <div class="slider-group" style="border-top:1px solid var(--border-card);padding-top:12px;">
+            <div class="slider-row">
+              <div class="slider-label">☀️ Master</div>
+              <input type="range" id="brightness-slider" min="0" max="100" value="100"
+                oninput="onBrightnessInput(this.value)">
+              <div class="val-badge" id="brightness-badge">100%</div>
+            </div>
+          </div>
+
+          <!-- RGBW Sliders with Quick 100% / 0% Buttons (SSCOM N16-N23) -->
+          <div class="slider-group" style="border-top:1px solid var(--border-card);padding-top:10px;">
+            <div class="slider-row">
+              <div class="slider-label" style="color:#ef4444;">🔴 Red (1)</div>
+              <input type="range" id="slider-r" min="0" max="255" value="255"
+                oninput="onChannelSlider(1,'r',this.value)" style="--track-color:#ef4444;">
+              <div class="val-badge" id="badge-r">255</div>
+              <div class="quick-pills">
+                <button class="pill-btn" title="SSCOM N16: R 100%" onclick="setChannelDirect(1,255)">100%</button>
+                <button class="pill-btn" title="SSCOM N17: R 0%" onclick="setChannelDirect(1,0)">0%</button>
+              </div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label" style="color:#22c55e;">🟢 Green (2)</div>
+              <input type="range" id="slider-g" min="0" max="255" value="0" oninput="onChannelSlider(2,'g',this.value)"
+                style="--track-color:#22c55e;">
+              <div class="val-badge" id="badge-g">0</div>
+              <div class="quick-pills">
+                <button class="pill-btn" title="SSCOM N18: G 100%" onclick="setChannelDirect(2,255)">100%</button>
+                <button class="pill-btn" title="SSCOM N19: G 0%" onclick="setChannelDirect(2,0)">0%</button>
+              </div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label" style="color:#3b82f6;">🔵 Blue (3)</div>
+              <input type="range" id="slider-b" min="0" max="255" value="0" oninput="onChannelSlider(3,'b',this.value)"
+                style="--track-color:#3b82f6;">
+              <div class="val-badge" id="badge-b">0</div>
+              <div class="quick-pills">
+                <button class="pill-btn" title="SSCOM N20: B 100%" onclick="setChannelDirect(3,255)">100%</button>
+                <button class="pill-btn" title="SSCOM N21: B 0%" onclick="setChannelDirect(3,0)">0%</button>
+              </div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label" style="color:#e2e8f0;">⚪ White (4)</div>
+              <input type="range" id="slider-w" min="0" max="255" value="0" oninput="onChannelSlider(4,'w',this.value)"
+                style="--track-color:#e2e8f0;">
+              <div class="val-badge" id="badge-w">0</div>
+              <div class="quick-pills">
+                <button class="pill-btn" title="SSCOM N22: W 100%" onclick="setChannelDirect(4,255)">100%</button>
+                <button class="pill-btn" title="SSCOM N23: W 0%" onclick="setChannelDirect(4,0)">0%</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Presets (Full SSCOM Palette) -->
+          <div class="card-title" style="margin-top:4px;"><span>Color Presets</span></div>
+          <div class="presets-grid">
+            <button class="preset-btn" onclick="setPreset(255,0,0,0)">
+              <div class="swatch" style="background:#ef4444;"></div>Red (R)
+            </button>
+            <button class="preset-btn" onclick="setPreset(0,255,0,0)">
+              <div class="swatch" style="background:#22c55e;"></div>Green (G)
+            </button>
+            <button class="preset-btn" onclick="setPreset(0,0,255,0)">
+              <div class="swatch" style="background:#3b82f6;"></div>Blue (B)
+            </button>
+            <button class="preset-btn" onclick="setPreset(0,0,0,255)">
+              <div class="swatch" style="background:#f8fafc;"></div>White (W)
+            </button>
+            <button class="preset-btn" onclick="setPreset(0,255,255,0)">
+              <div class="swatch" style="background:#06b6d4;"></div>Cyan
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,255,0,0)">
+              <div class="swatch" style="background:#eab308;"></div>Yellow
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,0,255,0)">
+              <div class="swatch" style="background:#d946ef;"></div>Magenta
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,120,0,0)">
+              <div class="swatch" style="background:#f97316;"></div>Orange
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,190,40,60)">
+              <div class="swatch" style="background:#f59e0b;"></div>Warm Amber
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,60,120,40)">
+              <div class="swatch" style="background:#f472b6;"></div>Pink Rose
+            </button>
+            <button class="preset-btn" onclick="setPreset(255,255,255,255)">
+              <div class="swatch" style="background:#ffffff;"></div>All ON
+            </button>
+            <button class="preset-btn" onclick="setPreset(0,0,0,0)">
+              <div class="swatch" style="background:#1e293b;border:1px solid #334155;"></div>All OFF
+            </button>
+          </div>
+        </div>
+
+        <!-- Right column: Effects + Config + Terminal -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+
+          <!-- Effects Card with Breathe, Rainbow, Flash, Strobe, Pulse, Speed -->
+          <div class="card">
+            <div class="card-title">
+              <span>Dynamic Animation &amp; Effects</span>
+              <div class="effect-speed-bar">
+                <span class="speed-label">Speed:</span>
+                <button class="speed-btn" id="spd-05" onclick="setEffectSpeed(0.5)">0.5×</button>
+                <button class="speed-btn active" id="spd-10" onclick="setEffectSpeed(1.0)">1.0×</button>
+                <button class="speed-btn" id="spd-20" onclick="setEffectSpeed(2.0)">2.0×</button>
+              </div>
+            </div>
+            <div class="effects-grid">
+              <button class="btn effect-btn" id="eff-breathe" onclick="triggerEffect('breathe')" title="Autonomous Sinusoidal PWM Breathe Macro">🫁 Breathe (Macro)</button>
+              <button class="btn effect-btn" id="eff-breathe_color" onclick="triggerEffect('breathe_color')" title="Breathing Fade on Active Color">💨 Color Breathe</button>
+              <button class="btn effect-btn" id="eff-jump7" onclick="triggerEffect('jump7')" title="SSCOM N15: 7-Color Jump Flash">🌈 7-Color Flash</button>
+              <button class="btn effect-btn" id="eff-rainbow" onclick="triggerEffect('rainbow')" title="Autonomous HSV Rainbow Loop">♾️ Rainbow Loop</button>
+              <button class="btn effect-btn" id="eff-strobe" onclick="triggerEffect('strobe')" title="High-Speed White Strobe / Alert Beacon">⚡ Strobe Flash</button>
+              <button class="btn effect-btn" id="eff-candle" onclick="triggerEffect('candle')" title="Organic Warm Candlelight Flicker">🕯️ Candle Pulse</button>
+              <button class="btn effect-btn" id="eff-jump3" onclick="triggerEffect('jump3')" title="Primary Tri-Color Fast Sequence">🚥 RGB Jump</button>
+              <button class="btn btn-danger effect-btn" id="eff-stop" onclick="triggerEffect('stop')" title="Stop effects and maintain steady color">⏹️ Stop Effect</button>
+            </div>
+          </div>
+
+          <!-- Gateway Config & SSCOM Diagnostics -->
+          <div class="card">
+            <div class="card-title"><span>Gateway Bridge &amp; Diagnostics</span></div>
+            <div class="config-grid">
+              <div class="input-group">
+                <label>Gateway IP</label>
+                <input type="text" id="cfg-ip" value="192.168.11.1">
+              </div>
+              <div class="input-group">
+                <label>Serial Port</label>
+                <select id="cfg-port">
+                  <option value="5021" selected>5021 — UART 3 (ttyS2)</option>
+                  <option value="5022">5022 — UART 2 (ttyS1)</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Slave Address</label>
+                <input type="text" id="cfg-addr" value="0xFF">
+              </div>
+            </div>
+
+            <!-- SSCOM Diagnostic Queries Toolbar (N9, N10, N11, N28) -->
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-card);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">SSCOM Queries:</span>
+              <button class="btn sm" onclick="queryDevice('rgb')" title="SSCOM N11: A5 03 00 A0 EE 5A">🔍 Query RGB (N11)</button>
+              <button class="btn sm" onclick="queryDevice('addr')" title="SSCOM N10: A5 04 FF B1 00 EE 5A">📡 Query Address (N10)</button>
+              <button class="btn sm" onclick="queryDevice('baud')" title="SSCOM N28: A5 03 FF B5 EE 5A">⚡ Query Baud (N28)</button>
+            </div>
+          </div>
+
+          <!-- Terminal -->
+          <div class="card" style="flex:1;">
+            <div class="card-title">
+              <span>Serial Stream Inspector</span>
+              <button class="btn sm" onclick="clearLogs()">Clear</button>
+            </div>
+            <div class="terminal-box" id="terminal-box">
+              <div class="log-line">
+                <span class="log-time">[System]</span>
+                <span style="color:#a855f7;">Controller ready. Dual-sync enabled.</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <input type="text" id="raw-hex-input" placeholder="Raw hex: a5 07 ff a0 ff 00 00 00 ee 5a"
+                style="flex:1;">
+              <button class="btn btn-primary" onclick="sendRawHex()">Send Hex</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PORTS SECTION ═══════════════════════════════════════════ -->
+    <div id="section-ports" class="section hidden">
+
+      <div class="ports-header">
+        <div class="ports-info">
+          <h2>GPIO Port Manager</h2>
+          <p>Physical ports on the CJI WMD-7621U gateway controlled via MTK GPIO driver</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="gpio-legend">
+            <span class="legend-dot on"></span>ON &nbsp;
+            <span class="legend-dot off"></span>OFF &nbsp;
+            <span class="legend-dot busy"></span>Busy
+          </div>
+          <button class="btn btn-primary" id="btn-all-on" onclick="setAllPorts(true)">All ON</button>
+          <button class="btn btn-danger" id="btn-all-off" onclick="setAllPorts(false)">All OFF</button>
+        </div>
+      </div>
+
+      <!-- 4 Port Cards Grid -->
+      <div class="ports-grid">
+
+        <!-- Port 1 -->
+        <div class="port-card" id="port-card-1">
+          <div class="port-header">
+            <div class="port-id">
+              <div class="port-number">1</div>
+              <div>
+                <div class="port-name">Port 1 (AC Relay)</div>
+                <div class="port-gpio">GPIO 13 &bull; Saved to Flash</div>
+              </div>
+            </div>
+            <div class="port-status-badge" id="badge-port-1">OFF</div>
+          </div>
+          <div class="port-visual" id="visual-port-1">
+            <div class="port-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" />
+              </svg>
+            </div>
+            <div class="port-state-text" id="state-port-1">OFFLINE</div>
+          </div>
+          <div class="port-actions">
+            <button class="port-btn on" id="btn-on-1" onclick="setPort('1', true)">ON</button>
+            <button class="port-btn off" id="btn-off-1" onclick="setPort('1', false)">OFF</button>
+            <button class="port-btn toggle" onclick="togglePort('1')">Toggle</button>
+          </div>
+          <div class="port-log" id="log-port-1">Awaiting refresh…</div>
+        </div>
+
+        <!-- Port 2 -->
+        <div class="port-card" id="port-card-2">
+          <div class="port-header">
+            <div class="port-id">
+              <div class="port-number">2</div>
+              <div>
+                <div class="port-name">Port 2</div>
+                <div class="port-gpio">GPIO 14 &bull; Logic Out</div>
+              </div>
+            </div>
+            <div class="port-status-badge" id="badge-port-2">OFF</div>
+          </div>
+          <div class="port-visual" id="visual-port-2">
+            <div class="port-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" />
+              </svg>
+            </div>
+            <div class="port-state-text" id="state-port-2">OFFLINE</div>
+          </div>
+          <div class="port-actions">
+            <button class="port-btn on" onclick="setPort('2', true)">ON</button>
+            <button class="port-btn off" onclick="setPort('2', false)">OFF</button>
+            <button class="port-btn toggle" onclick="togglePort('2')">Toggle</button>
+          </div>
+          <div class="port-log" id="log-port-2">Awaiting refresh…</div>
+        </div>
+
+        <!-- Port 3 -->
+        <div class="port-card" id="port-card-3">
+          <div class="port-header">
+            <div class="port-id">
+              <div class="port-number">3</div>
+              <div>
+                <div class="port-name">Port 3</div>
+                <div class="port-gpio">GPIO 15 &bull; Logic Out</div>
+              </div>
+            </div>
+            <div class="port-status-badge" id="badge-port-3">OFF</div>
+          </div>
+          <div class="port-visual" id="visual-port-3">
+            <div class="port-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" />
+              </svg>
+            </div>
+            <div class="port-state-text" id="state-port-3">OFFLINE</div>
+          </div>
+          <div class="port-actions">
+            <button class="port-btn on" onclick="setPort('3', true)">ON</button>
+            <button class="port-btn off" onclick="setPort('3', false)">OFF</button>
+            <button class="port-btn toggle" onclick="togglePort('3')">Toggle</button>
+          </div>
+          <div class="port-log" id="log-port-3">Awaiting refresh…</div>
+        </div>
+
+        <!-- Relay -->
+        <div class="port-card" id="port-card-relay">
+          <div class="port-header">
+            <div class="port-id">
+              <div class="port-number" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">R</div>
+              <div>
+                <div class="port-name">Relay (Port 1 Mirror)</div>
+                <div class="port-gpio">GPIO 13 &bull; Physical AC</div>
+              </div>
+            </div>
+            <div class="port-status-badge" id="badge-port-relay">OFF</div>
+          </div>
+          <div class="port-visual" id="visual-port-relay">
+            <div class="port-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
+              </svg>
+            </div>
+            <div class="port-state-text" id="state-port-relay">OFFLINE</div>
+          </div>
+          <div class="port-actions">
+            <button class="port-btn on" onclick="setPort('relay', true)">ON</button>
+            <button class="port-btn off" onclick="setPort('relay', false)">OFF</button>
+            <button class="port-btn toggle" onclick="togglePort('relay')">Toggle</button>
+          </div>
+          <div class="port-log" id="log-port-relay">Awaiting refresh…</div>
+        </div>
+
+      </div><!-- /ports-grid -->
+
+      <!-- Hardware Mapping & Gateway Credentials Full Card -->
+      <div class="card summary-card-full">
+        <div class="summary-col-table">
+          <div class="card-title"><span>Hardware Output Mapping</span></div>
+          <table class="gpio-table">
+            <thead>
+              <tr>
+                <th>Port</th>
+                <th>GPIO Pin</th>
+                <th>Hardware Type</th>
+                <th>Live State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Port 1</td>
+                <td>GPIO 13</td>
+                <td>Physical Relay (Click, Saved to Flash)</td>
+                <td><span class="live-state" id="ls-1">—</span></td>
+              </tr>
+              <tr>
+                <td>Port 2</td>
+                <td>GPIO 14</td>
+                <td>Logic Output (Solid-State)</td>
+                <td><span class="live-state" id="ls-2">—</span></td>
+              </tr>
+              <tr>
+                <td>Port 3</td>
+                <td>GPIO 15</td>
+                <td>Logic Output (Solid-State)</td>
+                <td><span class="live-state" id="ls-3">—</span></td>
+              </tr>
+              <tr>
+                <td>Relay (AC)</td>
+                <td>GPIO 13</td>
+                <td>Mirrors Port 1</td>
+                <td><span class="live-state" id="ls-relay">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="summary-col-creds">
+          <div class="card-title"><span>Gateway Status &amp; Diagnostics</span></div>
+          <div class="cred-grid">
+            <div class="cred-item">
+              <span class="cred-label">IP Address</span>
+              <span class="mono" id="disp-ip">192.168.11.1</span>
+            </div>
+            <div class="cred-item">
+              <span class="cred-label">Authentication</span>
+              <span class="mono">admin : admin</span>
+            </div>
+            <div class="cred-item">
+              <span class="cred-label">Control Bus</span>
+              <span class="mono">Telnet Port 23 / apply.cgi</span>
+            </div>
+            <div class="cred-item">
+              <span class="cred-label">Flash Persistence</span>
+              <span class="mono" style="color:var(--success);">MTD Flash &amp; EXT4 NVRAM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /section-ports -->
+
+    <!-- ══ ENVIRONMENTAL SENSOR SECTION ═════════════════════════════ -->
+    <div id="section-sensor" class="section hidden">
+      <!-- Sensor Toolbar Header -->
+      <div class="sensor-header">
+        <div class="sensor-info">
+          <h2>Micro Meteorological &amp; Air Quality Transmitter</h2>
+          <p>Modbus RTU over Gateway Serial Bridge &bull; 22 Multi-Element Sensor Registers (FC 0x03)</p>
+        </div>
+        <div class="sensor-toolbar-actions">
+          <div class="sensor-config-capsule">
+            <label>Port:</label>
+            <select id="sensor-cfg-port" onchange="onSensorConfigChange()">
+              <option value="5021" selected>5021 (UART 3 / ttyS2)</option>
+              <option value="5022">5022 (UART 2 / ttyS1)</option>
+            </select>
+            <label>Slave:</label>
+            <input type="text" id="sensor-cfg-addr" value="0xFF" onchange="onSensorConfigChange()" style="width:48px;">
+          </div>
+          <div class="sensor-config-capsule">
+            <label>Poll:</label>
+            <select id="sensor-poll-interval" onchange="onSensorPollIntervalChange()">
+              <option value="2000" selected>Every 2s</option>
+              <option value="5000">Every 5s</option>
+              <option value="10000">Every 10s</option>
+              <option value="0">Manual Only</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="sensor-read-btn" onclick="pollSensorNow()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;margin-right:4px;">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Read Now
+          </button>
+          <div class="sensor-status-badge" id="sensor-status-badge">
+            <span class="status-pulse-dot" id="sensor-pulse-dot"></span>
+            <span id="sensor-status-text">Ready</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Telemetry Grid (6 Core Gauges) -->
+      <div class="telemetry-grid">
+        <!-- Air Temperature -->
+        <div class="telemetry-card" style="--accent-color: #f43f5e;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">🌡️</span>
+              <div>
+                <div class="metric-title">Air Temperature</div>
+                <div class="metric-register">Reg 0x0009 &bull; -40~+60°C</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-temp">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-temp">--<span class="metric-unit">°C</span></div>
+            <div class="metric-alt-value" id="val-temp-f">-- °F</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-temp" style="width: 50%; background: linear-gradient(90deg, #3b82f6, #f43f5e);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>-40°C</span><span>0°C</span><span>+60°C</span></div>
+        </div>
+
+        <!-- Relative Humidity -->
+        <div class="telemetry-card" style="--accent-color: #06b6d4;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">💧</span>
+              <div>
+                <div class="metric-title">Relative Humidity</div>
+                <div class="metric-register">Reg 0x000A &bull; 0~100%RH</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-hum">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-hum">--<span class="metric-unit">%RH</span></div>
+            <div class="metric-alt-value" id="val-dew-point">Dew Pt: --°C</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-hum" style="width: 40%; background: linear-gradient(90deg, #06b6d4, #3b82f6);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+        </div>
+
+        <!-- Ambient Noise -->
+        <div class="telemetry-card" style="--accent-color: #a855f7;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">🔊</span>
+              <div>
+                <div class="metric-title">Ambient Noise</div>
+                <div class="metric-register">Reg 0x0001 &bull; 30~120 dB</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-noise">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-noise">--<span class="metric-unit">dB</span></div>
+            <div class="metric-alt-value" id="val-noise-sub">SPL Acoustic</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-noise" style="width: 45%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>30 dB</span><span>70 dB</span><span>120 dB</span></div>
+        </div>
+
+        <!-- PM2.5 Particulate -->
+        <div class="telemetry-card" style="--accent-color: #10b981;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">🍃</span>
+              <div>
+                <div class="metric-title">PM2.5 Fine Dust</div>
+                <div class="metric-register">Reg 0x0007 &bull; µg/m³</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-pm25">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-pm25">--<span class="metric-unit">µg/m³</span></div>
+            <div class="metric-alt-value" id="val-pm25-aqi">AQI: --</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-pm25" style="width: 15%; background: linear-gradient(90deg, #10b981, #eab308);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>0 Clean</span><span>35 Mod</span><span>150+ Alert</span></div>
+        </div>
+
+        <!-- PM10 Particulate -->
+        <div class="telemetry-card" style="--accent-color: #34d399;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">🌫️</span>
+              <div>
+                <div class="metric-title">PM10 Inhalable Dust</div>
+                <div class="metric-register">Reg 0x0008 &bull; µg/m³</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-pm10">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-pm10">--<span class="metric-unit">µg/m³</span></div>
+            <div class="metric-alt-value" id="val-pm10-sub">Coarse Dust</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-pm10" style="width: 20%; background: linear-gradient(90deg, #10b981, #f59e0b);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>0 Clean</span><span>50 Mod</span><span>250+ Alert</span></div>
+        </div>
+
+        <!-- Carbon Dioxide CO2 -->
+        <div class="telemetry-card" style="--accent-color: #f59e0b;">
+          <div class="telemetry-card-header">
+            <div class="card-icon-title">
+              <span class="sensor-icon">☁️</span>
+              <div>
+                <div class="metric-title">Carbon Dioxide (CO₂)</div>
+                <div class="metric-register">Reg 0x0012 &bull; NDIR</div>
+              </div>
+            </div>
+            <span class="telemetry-badge" id="badge-co2">--</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-main-value" id="val-co2">--<span class="metric-unit">ppm</span></div>
+            <div class="metric-alt-value" id="val-co2-sub">Concentration</div>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="meter-co2" style="width: 25%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);"></div>
+          </div>
+          <div class="meter-scale-labels"><span>400 ppm</span><span>1000 ppm</span><span>2000+ ppm</span></div>
+        </div>
+      </div>
+
+      <!-- Secondary Atmospheric & Meteorological Parameters Row -->
+      <div class="secondary-params-strip">
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">🌪️</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Barometer</div>
+            <div class="sub-param-value" id="val-pressure">-- <span class="sub-unit">hPa</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">💨</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Wind Speed</div>
+            <div class="sub-param-value" id="val-wind-speed">-- <span class="sub-unit">m/s</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">🧭</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Direction</div>
+            <div class="sub-param-value" id="val-wind-dir">-- <span class="sub-unit">°</span> <span id="val-compass" class="sub-tag">--</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">🌧️</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Rainfall</div>
+            <div class="sub-param-value" id="val-rain">-- <span class="sub-unit">mm</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">☀️</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Solar Rad</div>
+            <div class="sub-param-value" id="val-solar">-- <span class="sub-unit">W/m²</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">💡</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Illuminance</div>
+            <div class="sub-param-value" id="val-lux">-- <span class="sub-unit">Lux</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">🟣</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">UV Index</div>
+            <div class="sub-param-value" id="val-uv">-- <span class="sub-unit">Index</span></div>
+          </div>
+        </div>
+        <div class="sub-param-pill">
+          <span class="sub-param-icon">⚡</span>
+          <div class="sub-param-body">
+            <div class="sub-param-label">Anions</div>
+            <div class="sub-param-value" id="val-ions">-- <span class="sub-unit">ions</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modbus RTU Live Frame & Diagnostics Footer Card -->
+      <div class="sensor-diag-card">
+        <div class="sensor-diag-col">
+          <div class="card-title">
+            <span>Live Modbus RTU Bus Frames</span>
+            <span class="mono" id="sensor-last-polled-time">Last update: Never</span>
+          </div>
+          <div class="bus-frame-row">
+            <span class="frame-tag tx">TX Query (PC &rarr; GW &rarr; Sensor):</span>
+            <span class="frame-hex" id="sensor-tx-hex">FF 03 00 01 00 16 80 1A</span>
+          </div>
+          <div class="bus-frame-row">
+            <span class="frame-tag rx">RX Response (Sensor &rarr; GW &rarr; PC):</span>
+            <span class="frame-hex" id="sensor-rx-hex">Awaiting response…</span>
+          </div>
+          <div class="frame-status-row" id="sensor-frame-status">
+            <span class="status-chip" id="chip-crc">CRC: --</span>
+            <span class="status-chip" id="chip-len">Length: -- bytes</span>
+            <span class="status-chip" id="chip-fc">FC 0x03</span>
+            <span class="status-chip" id="chip-port">Port: 5021 (UART 3)</span>
+          </div>
+        </div>
+        <div class="sensor-diag-col" style="max-width:320px;">
+          <div class="card-title">
+            <span>Hardware Wiring Guide</span>
+            <span class="tag">RS-485</span>
+          </div>
+          <div class="wiring-tip-box">
+            <div class="tip-line"><strong>Bus Pins:</strong> A (TX+) &amp; B (RX-) on UART 3 (Serial Port 3).</div>
+            <div class="tip-line"><strong>Sensor Power:</strong> 12V DC / Gateway Port 1 (GPIO 13 Relay).</div>
+            <div class="tip-line"><strong>Baudrate:</strong> 9600 bps 8N1 via gateway <code>ser2net_s2</code> on TCP 5021.</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /section-sensor -->
+
+  </div><!-- /container -->
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
